@@ -1,7 +1,14 @@
+import pg from 'pg';
 import { pullImage, stopAndRemoveContainer, runContainer } from './docker.js';
 import { getDecryptedEnvVars } from './env.js';
 import { pushBuildLog } from './queue.js';
 import { config } from './config.js';
+
+const pool = new pg.Pool({ connectionString: config.databaseUrl });
+
+function updateDeployStatus(deployId, status) {
+  return pool.query('UPDATE deploys SET status=$1, finished_at=NOW() WHERE id=$2', [status, deployId]);
+}
 
 const isLocalMode = !config.registry.url || config.registry.url === 'registry.local';
 
@@ -10,6 +17,8 @@ export async function runDeploy(task) {
   const containerName = `app-${repoName}-${projectId}`;
 
   try {
+    await updateDeployStatus(deployId, 'deploying');
+
     if (!isLocalMode) {
       await log(deployId, 'Pulling image...');
       pullImage(image);
@@ -21,12 +30,10 @@ export async function runDeploy(task) {
 
     await log(deployId, 'Loading environment variables...');
     const envVars = await getDecryptedEnvVars(projectId);
-    // Platform-injected defaults
     envVars.push({ key: 'PLATFORM_APP_URL', value: `https://${domain}` });
     envVars.push({ key: 'PORT', value: String(targetPort) });
 
     await log(deployId, 'Starting container...');
-    // Local mode: assign host port = 4000 + projectId
     const hostPort = isLocalMode ? String(4000 + projectId) : null;
     if (hostPort) await log(deployId, `Local mode: mapping host port ${hostPort}:${targetPort}`);
     runContainer({ image, containerName, targetPort, domain, envVars, hostPort });
@@ -37,9 +44,11 @@ export async function runDeploy(task) {
     }
 
     await log(deployId, `Deploy complete! https://${domain}`);
+    await updateDeployStatus(deployId, 'running');
     await pushBuildLog(deployId, '__STATUS__:running');
   } catch (err) {
     await log(deployId, `Deploy failed: ${err.message}`);
+    await updateDeployStatus(deployId, 'failed');
     await pushBuildLog(deployId, '__STATUS__:failed');
   }
 }

@@ -48,7 +48,7 @@ const S = {
   },
 };
 
-export default function Login() {
+export default function Login({ onLogin }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
@@ -58,6 +58,7 @@ export default function Login() {
     const token = params.get('token');
     if (token) {
       setToken(token);
+      if (onLogin) onLogin();
       navigate('/');
       return;
     }
