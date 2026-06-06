@@ -1,0 +1,83 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+  REGISTRY_NAMESPACE: ${{ secrets.REGISTRY_NAMESPACE }}
+
+jobs:
+  build-and-deploy:
+    name: Build, Push & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Docker image tag
+        run: |
+          echo "IMAGE_TAG=${GITHUB_SHA::7}" >> $GITHUB_ENV
+          echo "REGISTRY_BASE=${REGISTRY_URL}/${REGISTRY_NAMESPACE}" >> $GITHUB_ENV
+
+      - name: Login to container registry
+        run: |
+          echo "${{ secrets.REGISTRY_PASSWORD }}" | \
+            docker login "${{ secrets.REGISTRY_URL }}" \
+            -u "${{ secrets.REGISTRY_USERNAME }}" \
+            --password-stdin
+
+      - name: Build & push api-server
+        run: |
+          docker build \
+            -t $REGISTRY_BASE/plat-api-server:$IMAGE_TAG \
+            -t $REGISTRY_BASE/plat-api-server:latest \
+            ./platform/api-server
+          docker push $REGISTRY_BASE/plat-api-server:$IMAGE_TAG
+          docker push $REGISTRY_BASE/plat-api-server:latest
+
+      - name: Build & push build-runner
+        run: |
+          docker build \
+            -t $REGISTRY_BASE/plat-build-runner:$IMAGE_TAG \
+            -t $REGISTRY_BASE/plat-build-runner:latest \
+            ./platform/build-runner
+          docker push $REGISTRY_BASE/plat-build-runner:$IMAGE_TAG
+          docker push $REGISTRY_BASE/plat-build-runner:latest
+
+      - name: Build & push deploy-scheduler
+        run: |
+          docker build \
+            -t $REGISTRY_BASE/plat-deploy-scheduler:$IMAGE_TAG \
+            -t $REGISTRY_BASE/plat-deploy-scheduler:latest \
+            ./platform/deploy-scheduler
+          docker push $REGISTRY_BASE/plat-deploy-scheduler:$IMAGE_TAG
+          docker push $REGISTRY_BASE/plat-deploy-scheduler:latest
+
+      - name: Build & push web
+        run: |
+          docker build \
+            -t $REGISTRY_BASE/plat-web:$IMAGE_TAG \
+            -t $REGISTRY_BASE/plat-web:latest \
+            ./platform/web
+          docker push $REGISTRY_BASE/plat-web:$IMAGE_TAG
+          docker push $REGISTRY_BASE/plat-web:latest
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /opt/plat
+            cat > .env.ci << EOF
+            REGISTRY_URL=${{ secrets.REGISTRY_URL }}
+            REGISTRY_NAMESPACE=${{ secrets.REGISTRY_NAMESPACE }}
+            EOF
+            docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci pull
+            docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci up -d --remove-orphans
+            rm -f .env.ci
+            docker image prune -f

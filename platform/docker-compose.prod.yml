@@ -1,0 +1,111 @@
+# Production override — uses pre-built images from container registry.
+# Usage:
+#   echo "REGISTRY_URL=ccr.ccs.tencentyun.com" > .env.prod
+#   echo "REGISTRY_NAMESPACE=plat" >> .env.prod
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+
+services:
+  traefik:
+    image: traefik:v3.3
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik-certs:/letsencrypt
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      retries: 5
+
+  api-server:
+    image: ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/plat-api-server:latest
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET}
+      GITHUB_APP_ID: ${GITHUB_APP_ID}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY}
+      GITHUB_WEBHOOK_SECRET: ${GITHUB_WEBHOOK_SECRET}
+      REGISTRY_URL: ${REGISTRY_URL}
+      REGISTRY_NAMESPACE: ${REGISTRY_NAMESPACE}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${PLATFORM_DOMAIN}`)"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  build-runner:
+    image: ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/plat-build-runner:latest
+    environment:
+      REDIS_URL: redis://redis:6379
+      REGISTRY_URL: ${REGISTRY_URL}
+      REGISTRY_NAMESPACE: ${REGISTRY_NAMESPACE}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - build-tmp:/tmp/builds
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  deploy-scheduler:
+    image: ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/plat-deploy-scheduler:latest
+    environment:
+      REDIS_URL: redis://redis:6379
+      REGISTRY_URL: ${REGISTRY_URL}
+      REGISTRY_NAMESPACE: ${REGISTRY_NAMESPACE}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    image: ${REGISTRY_URL}/${REGISTRY_NAMESPACE}/plat-web:latest
+    depends_on:
+      - api-server
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  traefik-certs:
+  build-tmp:
