@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   traefik:
     image: traefik:v3.2
@@ -51,6 +49,8 @@ services:
       REGISTRY_URL: ${REGISTRY_URL}
       REGISTRY_NAMESPACE: ${REGISTRY_NAMESPACE}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
+    ports:
+      - "3000:3000"  # local dev direct access
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=Host(`api.${PLATFORM_DOMAIN}`)"
@@ -92,6 +92,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: ./web
+    ports:
+      - "5173:80"  # local dev: vite dev port -> nginx
+    depends_on:
+      - api-server
     restart: unless-stopped
 
 volumes:

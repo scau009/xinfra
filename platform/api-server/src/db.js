@@ -6,6 +6,8 @@ const pool = new pg.Pool({
 });
 
 const SCHEMA_SQL = `
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     github_id BIGINT UNIQUE,
