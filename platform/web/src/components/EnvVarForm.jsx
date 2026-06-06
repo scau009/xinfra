@@ -1,63 +1,149 @@
 import { useState, useEffect } from 'react';
+import { getToken } from '../auth';
+
+const S = {
+  item: {
+    display:'flex',alignItems:'center',padding:'10px 0',
+    borderBottom:'1px solid var(--border)',
+    gap:'12px',
+  },
+  key: { flex:1,fontSize:'12px',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' },
+  value: {
+    fontSize:'11px',color:'var(--text-muted)',
+    letterSpacing:'0.2em',marginRight:'8px',
+  },
+  delBtn: {
+    padding:'4px 10px',backgroundColor:'transparent',
+    color:'var(--danger)',border:'1px solid transparent',
+    fontSize:'10px',cursor:'pointer',textTransform:'uppercase',
+    letterSpacing:'0.1em',transition:'all .15s',
+  },
+  form: {
+    display:'flex',gap:'8px',marginTop:'14px',paddingTop:'14px',
+    borderTop:'1px solid var(--border)',
+  },
+  input: {
+    padding:'8px 12px',backgroundColor:'var(--bg)',color:'var(--text)',
+    border:'1px solid var(--border)',outline:'none',fontSize:'11px',
+    transition:'border-color .15s',
+  },
+  addBtn: {
+    padding:'8px 18px',backgroundColor:'var(--accent)',color:'var(--bg)',
+    border:'none',fontSize:'11px',fontWeight:600,textTransform:'uppercase',
+    letterSpacing:'0.1em',cursor:'pointer',
+  },
+  empty: {
+    padding:'20px 0',color:'var(--text-muted)',fontSize:'11px',
+    textAlign:'center',borderBottom:'1px solid var(--border)',
+  },
+  error: {
+    padding:'6px 0',color:'var(--danger)',fontSize:'11px',
+  },
+};
 
 export default function EnvVarForm({ projectId }) {
   const [vars, setVars] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [adding, setAdding] = useState(false);
+
+  const token = getToken();
+  const headers = {
+    'Content-Type':'application/json',
+    Authorization:`Bearer ${token}`,
+  };
 
   useEffect(() => {
-    fetch(`/api/projects/${projectId}/env`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('plat_token')}` },
-    }).then(r => r.json()).then(setVars).catch(() => {});
+    fetch(`/api/projects/${projectId}/env`,{headers})
+      .then(r=>r.json())
+      .then(setVars)
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
   }, [projectId]);
 
   async function addVar(e) {
     e.preventDefault();
-    if (!newKey.trim()) return;
-    await fetch(`/api/projects/${projectId}/env`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('plat_token')}`,
-      },
-      body: JSON.stringify({ key: newKey.trim(), value: newValue }),
-    });
-    setVars([...vars, { key: newKey.trim() }]);
-    setNewKey('');
-    setNewValue('');
+    if(!newKey.trim()) return;
+    setError(null);
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/env`,{
+        method:'POST',headers,
+        body:JSON.stringify({key:newKey.trim(),value:newValue}),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(()=>({error:'Failed'}));
+        throw new Error(err.error);
+      }
+      setVars(prev=>{
+        const exists = prev.find(v=>v.key===newKey.trim());
+        if(exists) return prev.map(v=>v.key===newKey.trim()?{...v}:v);
+        return [...prev,{key:newKey.trim()}];
+      });
+      setNewKey('');
+      setNewValue('');
+    } catch(err) {
+      setError(err.message);
+    } finally {
+      setAdding(false);
+    }
   }
 
   async function deleteVar(key) {
-    await fetch(`/api/projects/${projectId}/env/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${localStorage.getItem('plat_token')}` },
-    });
-    setVars(vars.filter(v => v.key !== key));
+    try {
+      await fetch(`/api/projects/${projectId}/env/${encodeURIComponent(key)}`,{
+        method:'DELETE',headers,
+      });
+      setVars(prev=>prev.filter(v=>v.key!==key));
+    } catch {}
   }
 
   return (
     <div>
-      {vars.map((v) => (
-        <div key={v.key} style={{ display: 'flex', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1a1a1a' }}>
-          <code style={{ flex: 1 }}>{v.key}</code>
-          <span style={{ color: '#666', marginRight: '12px' }}>&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</span>
-          <button onClick={() => deleteVar(v.key)} style={{ color: '#ff4444', background: 'none', border: 'none', cursor: 'pointer' }}>Delete</button>
-        </div>
-      ))}
-      <form onSubmit={addVar} style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-        <input value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="KEY" style={inputStyle} />
-        <input value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="VALUE" style={{ ...inputStyle, flex: 2 }} />
-        <button type="submit" style={addBtnStyle}>Add</button>
+      {loading ? (
+        <div style={S.empty}>Loading...</div>
+      ) : vars.length === 0 ? (
+        <div style={S.empty}>No environment variables configured</div>
+      ) : (
+        vars.map(v=>(
+          <div key={v.key} style={S.item}>
+            <code style={S.key}>{v.key}</code>
+            <span style={S.value}>········</span>
+            <button
+              style={S.delBtn}
+              onClick={()=>deleteVar(v.key)}
+              onMouseEnter={e=>e.target.style.borderColor='var(--danger)'}
+              onMouseLeave={e=>e.target.style.borderColor='transparent'}
+            >Del</button>
+          </div>
+        ))
+      )}
+
+      {error && <div style={S.error}>! {error}</div>}
+
+      <form onSubmit={addVar} style={S.form}>
+        <input
+          value={newKey} onChange={e=>setNewKey(e.target.value)}
+          placeholder="KEY" style={{...S.input,width:'140px'}}
+          onFocus={e=>e.target.style.borderColor='var(--border-light)'}
+          onBlur={e=>e.target.style.borderColor='var(--border)'}
+        />
+        <input
+          value={newValue} onChange={e=>setNewValue(e.target.value)}
+          placeholder="VALUE" style={{...S.input,flex:1}}
+          onFocus={e=>e.target.style.borderColor='var(--border-light)'}
+          onBlur={e=>e.target.style.borderColor='var(--border)'}
+        />
+        <button type="submit" disabled={adding} style={{
+          ...S.addBtn,
+          opacity:adding?0.5:1,
+          cursor:adding?'wait':'pointer',
+        }}>
+          {adding ? '...' : 'Add'}
+        </button>
       </form>
     </div>
   );
 }
-
-const inputStyle = {
-  padding: '8px 12px', backgroundColor: '#1a1a1a', color: '#fff',
-  border: '1px solid #333', borderRadius: '6px', fontSize: '13px',
-};
-const addBtnStyle = {
-  padding: '8px 16px', backgroundColor: '#fff', color: '#000',
-  border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer',
-};

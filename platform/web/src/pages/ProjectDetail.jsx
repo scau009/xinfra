@@ -5,12 +5,67 @@ import DeployButton from '../components/DeployButton';
 import EnvVarForm from '../components/EnvVarForm';
 import DeployLog from './DeployLog';
 
-const STATUS_COLORS = {
-  pending: '#888',
-  building: '#f0a500',
-  deploying: '#f0a500',
-  running: '#00c853',
-  failed: '#ff1744',
+const STATUS = {
+  pending:   { color:'var(--text-muted)',label:'pending',  icon:'○' },
+  building:  { color:'var(--warn)',     label:'building', icon:'◉' },
+  deploying: { color:'var(--warn)',     label:'deploying',icon:'◉' },
+  running:   { color:'var(--success)',  label:'running',  icon:'●' },
+  failed:    { color:'var(--danger)',   label:'failed',   icon:'✕' },
+};
+
+const S = {
+  wrap: { minHeight:'100vh',maxWidth:'900px',margin:'0 auto',padding:'0 24px' },
+  topbar: {
+    display:'flex',alignItems:'center',gap:'20px',
+    padding:'20px 0',borderBottom:'1px solid var(--border)',
+    marginBottom:'36px',
+  },
+  back: {
+    color:'var(--text-dim)',textDecoration:'none',fontSize:'12px',
+    transition:'color .15s',padding:'4px 0',
+  },
+  title: {
+    fontSize:'13px',fontWeight:600,letterSpacing:'0.05em',
+  },
+  section: { marginBottom:'36px' },
+  sectionTitle: {
+    fontSize:'10px',fontWeight:600,textTransform:'uppercase',
+    letterSpacing:'0.2em',color:'var(--text-muted)',
+    marginBottom:'14px',
+  },
+  meta: {
+    display:'flex',gap:'32px',flexWrap:'wrap',
+    fontSize:'11px',color:'var(--text-dim)',
+    marginBottom:'24px',padding:'14px 18px',
+    backgroundColor:'var(--surface)',border:'1px solid var(--border)',
+  },
+  metaItem: { display:'flex',flexDirection:'column',gap:'2px' },
+  metaLabel: { fontSize:'10px',textTransform:'uppercase',letterSpacing:'0.1em',color:'var(--text-muted)' },
+  metaLink: { color:'var(--text)',textDecoration:'none',borderBottom:'1px solid var(--border-light)' },
+  deployBar: {
+    display:'flex',justifyContent:'space-between',alignItems:'center',
+    padding:'16px 20px',backgroundColor:'var(--surface)',
+    border:'1px solid var(--border)',marginBottom:'20px',
+  },
+  deployMsg: { fontSize:'11px',color:'var(--success)',fontWeight:500 },
+  deployErr: { fontSize:'11px',color:'var(--danger)',fontWeight:500 },
+  historyList: { display:'flex',flexDirection:'column',gap:'1px' },
+  historyRow: {
+    display:'flex',justifyContent:'space-between',alignItems:'center',
+    padding:'12px 16px',backgroundColor:'var(--surface)',
+    border:'1px solid var(--border)',cursor:'pointer',
+    transition:'all .12s',fontSize:'11px',
+  },
+  historyLeft: { display:'flex',alignItems:'center',gap:'10px' },
+  historyRight: { color:'var(--text-muted)',fontSize:'11px',textAlign:'right' },
+  historyMeta: { fontSize:'10px',color:'var(--text-muted)',marginTop:'2px' },
+  empty: {
+    textAlign:'center',padding:'32px 20px',color:'var(--text-muted)',
+    border:'1px dashed var(--border)',fontSize:'11px',
+    backgroundColor:'var(--surface)',
+  },
+  loading: { textAlign:'center',padding:'60px 20px',color:'var(--text-muted)' },
+  errorPage: { textAlign:'center',padding:'60px 20px',color:'var(--danger)' },
 };
 
 export default function ProjectDetail() {
@@ -19,11 +74,15 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeDeployId, setActiveDeployId] = useState(null);
+  const [deploying, setDeploying] = useState(false);
+  const [deployError, setDeployError] = useState(null);
+  const [deploySuccess, setDeploySuccess] = useState(false);
 
   async function load() {
     try {
       const data = await api.getProject(id);
       setProject(data);
+      setError(null);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -34,71 +93,125 @@ export default function ProjectDetail() {
   useEffect(() => { load(); }, [id]);
 
   async function handleDeploy() {
-    const deploy = await api.deployProject(id);
-    setActiveDeployId(deploy.id);
-    await load();
+    setDeploying(true);
+    setDeployError(null);
+    setDeploySuccess(false);
+    try {
+      const deploy = await api.deployProject(id);
+      setActiveDeployId(deploy.id);
+      setDeploySuccess(true);
+      await load();
+    } catch (err) {
+      setDeployError(err.message);
+    } finally {
+      setDeploying(false);
+    }
   }
 
-  if (loading) return <div style={styles.container}><p>Loading...</p></div>;
-  if (error) return <div style={styles.container}><p style={{color:'red'}}>{error}</p></div>;
-  if (!project) return <div style={styles.container}><p>Project not found</p></div>;
+  if (loading) return <div style={S.wrap}><div style={S.loading}>Loading...</div></div>;
+  if (error) return <div style={S.wrap}><div style={S.errorPage}>! {error}</div></div>;
+  if (!project) return <div style={S.wrap}><div style={S.errorPage}>Project not found</div></div>;
+
+  const hasRunning = project.deploys?.some(
+    d => d.status === 'building' || d.status === 'deploying' || d.status === 'pending'
+  );
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <Link to="/" style={styles.back}>&larr; Back</Link>
-        <h1>{project.repo_name}</h1>
-      </header>
+    <div style={S.wrap}>
+      <div style={S.topbar}>
+        <Link
+          to="/" style={S.back}
+          onMouseEnter={e=>e.target.style.color='var(--text)'}
+          onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
+        >&larr; Back</Link>
+        <span style={{color:'var(--text-muted)'}}>/</span>
+        <span style={S.title}>{project.repo_name}</span>
+      </div>
 
-      <div style={styles.content}>
-        <div style={styles.meta}>
-          <span>Domain: <a href={`https://${project.domain}`} target="_blank" rel="noopener" style={{color: '#4da6ff'}}>{project.domain}</a></span>
-          <span>Framework: {project.framework || 'auto-detect'}</span>
+      {/* Meta info */}
+      <div style={S.meta}>
+        <div style={S.metaItem}>
+          <span style={S.metaLabel}>Domain</span>
+          <a href={`https://${project.domain}`} target="_blank" rel="noopener" style={S.metaLink}>
+            {project.domain}
+          </a>
         </div>
+        <div style={S.metaItem}>
+          <span style={S.metaLabel}>Framework</span>
+          <span>{project.framework || 'auto'}</span>
+        </div>
+        <div style={S.metaItem}>
+          <span style={S.metaLabel}>Source</span>
+          <span>{project.source_type || 'github'}</span>
+        </div>
+      </div>
 
-        <DeployButton onDeploy={handleDeploy} hasRunningDeploy={project.deploys?.some(d => d.status === 'building' || d.status === 'deploying')} />
+      {/* Deploy bar */}
+      <div style={S.section}>
+        <div style={S.deployBar}>
+          <div>
+            {deployError && <span style={S.deployErr}>! {deployError}</span>}
+            {deploySuccess && !deployError && <span style={S.deployMsg}>Deploy queued</span>}
+          </div>
+          <DeployButton
+            onDeploy={handleDeploy}
+            loading={deploying}
+            hasRunningDeploy={hasRunning}
+          />
+        </div>
 
         {activeDeployId && (
           <DeployLog deployId={activeDeployId} onComplete={load} />
         )}
+      </div>
 
-        <h2 style={{ marginTop: '32px' }}>Deploy History</h2>
+      {/* Deploy history */}
+      <div style={S.section}>
+        <div style={S.sectionTitle}>History</div>
         {(!project.deploys || project.deploys.length === 0) ? (
-          <p style={styles.empty}>No deploys yet</p>
+          <div style={S.empty}>No deploy history yet. Click Deploy above to start.</div>
         ) : (
-          <div>
-            {project.deploys.map((d) => (
-              <div key={d.id} style={styles.deployRow} onClick={() => setActiveDeployId(d.id)}>
-                <div>
-                  <span style={{ ...styles.statusDot, backgroundColor: STATUS_COLORS[d.status] || '#888' }} />
-                  <strong style={{ marginLeft: '8px' }}>{d.status}</strong>
+          <div style={S.historyList}>
+            {project.deploys.map(d => {
+              const s = STATUS[d.status] || STATUS.pending;
+              return (
+                <div
+                  key={d.id}
+                  style={S.historyRow}
+                  onClick={() => setActiveDeployId(d.id)}
+                  onMouseEnter={e=>{
+                    e.target.style.borderColor='var(--border-light)';
+                    e.target.style.backgroundColor='var(--surface2)';
+                  }}
+                  onMouseLeave={e=>{
+                    e.target.style.borderColor='var(--border)';
+                    e.target.style.backgroundColor='var(--surface)';
+                  }}
+                >
+                  <div style={S.historyLeft}>
+                    <span style={{color:s.color,fontSize:'10px'}}>{s.icon}</span>
+                    <span style={{color:s.color,textTransform:'uppercase',letterSpacing:'0.1em'}}>
+                      {s.label}
+                    </span>
+                  </div>
+                  <div style={S.historyRight}>
+                    <div>{d.commit_sha ? d.commit_sha.slice(0,7) : 'manual'}</div>
+                    <div style={S.historyMeta}>
+                      {new Date(d.created_at).toLocaleString()}
+                    </div>
+                  </div>
                 </div>
-                <div style={styles.deployMeta}>
-                  {d.commit_sha ? d.commit_sha.slice(0, 7) : 'manual'}
-                  <span style={{ marginLeft: '12px', color: '#666' }}>
-                    {new Date(d.created_at).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
+      </div>
 
-        <h2 style={{ marginTop: '32px' }}>Environment Variables</h2>
+      {/* Environment variables */}
+      <div style={S.section}>
+        <div style={S.sectionTitle}>Environment</div>
         <EnvVarForm projectId={project.id} />
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: { minHeight: '100vh', backgroundColor: '#0a0a0a', color: '#fff', fontFamily: 'system-ui' },
-  header: { padding: '16px 32px', borderBottom: '1px solid #222' },
-  back: { color: '#888', textDecoration: 'none', fontSize: '14px' },
-  content: { maxWidth: '720px', margin: '0 auto', padding: '32px 16px' },
-  meta: { display: 'flex', gap: '24px', color: '#888', fontSize: '14px', marginBottom: '24px' },
-  empty: { color: '#666', textAlign: 'center', marginTop: '32px' },
-  deployRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', backgroundColor: '#111', border: '1px solid #222', borderRadius: '8px', marginBottom: '8px', cursor: 'pointer' },
-  statusDot: { display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%' },
-  deployMeta: { color: '#888', fontSize: '13px' },
-};

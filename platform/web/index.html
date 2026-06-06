@@ -1,9 +1,66 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plat — Deploy your code in seconds</title>
+  <title>PLAT — Deploy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#050505;
+      --surface:#0a0a0a;
+      --surface2:#0f0f0f;
+      --border:#1a1a1a;
+      --border-light:#252525;
+      --text:#ddd;
+      --text-dim:#777;
+      --text-muted:#444;
+      --accent:#fff;
+      --danger:#ff3333;
+      --success:#00e676;
+      --warn:#ffaa00;
+      --font:'JetBrains Mono',monospace;
+      --radius:2px;
+    }
+    body{
+      background:var(--bg);
+      color:var(--text);
+      font-family:var(--font);
+      font-size:12px;
+      line-height:1.65;
+      -webkit-font-smoothing:antialiased;
+      min-height:100vh;
+      letter-spacing:-0.01em;
+    }
+    body::before{
+      content:'';
+      position:fixed;
+      inset:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
+      background-size:40px 40px;
+      pointer-events:none;
+      z-index:0;
+    }
+    #root{position:relative;z-index:1}
+    a{color:var(--text);text-decoration:none}
+    button{font-family:var(--font);cursor:pointer;font-size:12px;letter-spacing:-0.01em}
+    input{font-family:var(--font);font-size:12px;letter-spacing:-0.01em}
+    ::selection{background:var(--accent);color:var(--bg)}
+    ::-webkit-scrollbar{width:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:var(--border-light)}
+
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
 </head>
 <body>
   <div id="root"></div>
