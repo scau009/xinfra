@@ -1,15 +1,20 @@
 import { pullImage, stopAndRemoveContainer, runContainer } from './docker.js';
 import { getDecryptedEnvVars } from './env.js';
 import { pushBuildLog } from './queue.js';
+import { config } from './config.js';
+
+const isLocalMode = !config.registry.url || config.registry.url === 'registry.local';
 
 export async function runDeploy(task) {
   const { deployId, projectId, image, targetPort, domain, repoName } = task;
   const containerName = `app-${repoName}-${projectId}`;
 
   try {
-    await log(deployId, 'Pulling image...');
-    pullImage(image);
-    await log(deployId, 'Image pulled');
+    if (!isLocalMode) {
+      await log(deployId, 'Pulling image...');
+      pullImage(image);
+      await log(deployId, 'Image pulled');
+    }
 
     await log(deployId, 'Stopping old container...');
     stopAndRemoveContainer(containerName);
@@ -21,8 +26,15 @@ export async function runDeploy(task) {
     envVars.push({ key: 'PORT', value: String(targetPort) });
 
     await log(deployId, 'Starting container...');
-    runContainer({ image, containerName, targetPort, domain, envVars });
+    // Local mode: assign host port = 4000 + projectId
+    const hostPort = isLocalMode ? String(4000 + projectId) : null;
+    if (hostPort) await log(deployId, `Local mode: mapping host port ${hostPort}:${targetPort}`);
+    runContainer({ image, containerName, targetPort, domain, envVars, hostPort });
     await log(deployId, 'Container started');
+
+    if (hostPort) {
+      await log(deployId, `App accessible at http://localhost:${hostPort}`);
+    }
 
     await log(deployId, `Deploy complete! https://${domain}`);
     await pushBuildLog(deployId, '__STATUS__:running');

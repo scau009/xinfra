@@ -13,7 +13,7 @@ export function stopAndRemoveContainer(containerName) {
   }
 }
 
-export function runContainer({ image, containerName, targetPort, domain, envVars, memory, cpus }) {
+export function runContainer({ image, containerName, targetPort, domain, envVars, memory, cpus, hostPort }) {
   const labels = [
     'traefik.enable=true',
     `traefik.http.routers.${containerName}.rule=Host(\`${domain}\`)`,
@@ -23,7 +23,9 @@ export function runContainer({ image, containerName, targetPort, domain, envVars
   const envArgs = envVars.map(({ key, value }) => `--env ${key}=${value}`).join(' ');
   const labelArgs = labels.map((l) => `--label "${l}"`).join(' ');
   const resourceArgs = `--memory=${memory || '512m'} --cpus=${cpus || '0.5'} --memory-swap=${memory || '512m'}`;
+  const portMap = hostPort ? `-p ${hostPort}:${targetPort}` : '';
+  const network = `--network platform_default`;
 
-  const cmd = `docker run -d --name ${containerName} ${resourceArgs} ${envArgs} ${labelArgs} ${image}`;
+  const cmd = `docker run -d --name ${containerName} ${network} ${resourceArgs} ${envArgs} ${labelArgs} ${portMap} ${image}`;
   execSync(cmd, { stdio: 'pipe' });
 }

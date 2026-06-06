@@ -66,17 +66,16 @@ export async function runBuild(task) {
       await fs.copyFile(ignorePath, path.join(buildDir, '.dockerignore'));
     }
 
-    // 4. Docker build + push
-    await log(deployId, 'Building Docker image...');
+    // 4. Docker build (local mode: no push to registry)
+    const isLocalMode = !config.registry.url || config.registry.url === 'registry.local';
+    await log(deployId, isLocalMode ? 'Building Docker image (local mode)...' : 'Building Docker image...');
+
     const buildPromise = new Promise((resolve, reject) => {
-      const proc = spawn('docker', [
-        'buildx', 'build',
-        '--cache-from', `type=registry,ref=${cacheImage}`,
-        '--cache-to', `type=registry,ref=${cacheImage},mode=max`,
-        '-t', imageName,
-        '--push',
-        buildDir,
-      ], { stdio: ['ignore', 'pipe', 'pipe'] });
+      const args = isLocalMode
+        ? ['build', '-t', imageName, buildDir]
+        : ['buildx', 'build', '--cache-from', `type=registry,ref=${cacheImage}`, '--cache-to', `type=registry,ref=${cacheImage},mode=max`, '-t', imageName, '--push', buildDir];
+
+      const proc = spawn('docker', args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
       proc.stdout.on('data', async (data) => {
         for (const line of data.toString().trim().split('\n')) {
@@ -97,7 +96,7 @@ export async function runBuild(task) {
     });
 
     await buildPromise;
-    await log(deployId, 'Build complete, image pushed');
+    await log(deployId, isLocalMode ? 'Build complete' : 'Build complete, image pushed');
 
     // 5. Clean up
     await fs.rm(buildDir, { recursive: true, force: true });
