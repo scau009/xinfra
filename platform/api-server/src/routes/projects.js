@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { jwtAuth } from '../middleware/jwtAuth.js';
 import { query } from '../db.js';
 import { pushBuildTask } from '../services/queue.js';
+import { encryptEnvVar } from '../services/crypto.js';
 
 const router = Router();
 
@@ -102,6 +103,62 @@ router.delete('/:id', jwtAuth, async (req, res) => {
   } catch (err) {
     console.error('Delete project error:', err);
     res.status(500).json({ error: 'Failed to delete project' });
+  }
+});
+
+// GET /api/projects/:id/env — list env vars (keys only, values masked)
+router.get('/:id/env', jwtAuth, async (req, res) => {
+  try {
+    const project = await query('SELECT * FROM projects WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.userId]);
+    if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const vars = await query('SELECT id, key FROM env_vars WHERE project_id=$1 ORDER BY key',
+      [req.params.id]);
+    res.json(vars.rows);
+  } catch (err) {
+    console.error('List env vars error:', err);
+    res.status(500).json({ error: 'Failed to list env vars' });
+  }
+});
+
+// POST /api/projects/:id/env — add or update env var
+router.post('/:id/env', jwtAuth, async (req, res) => {
+  try {
+    const { key, value } = req.body;
+    if (!key) return res.status(400).json({ error: 'key is required' });
+
+    const project = await query('SELECT * FROM projects WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.userId]);
+    if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const encrypted = encryptEnvVar(value || '');
+    await query(
+      `INSERT INTO env_vars (project_id, key, encrypted_value)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (project_id, key) DO UPDATE SET encrypted_value=$3`,
+      [req.params.id, key, encrypted]
+    );
+    res.status(201).json({ key, updated: true });
+  } catch (err) {
+    console.error('Set env var error:', err);
+    res.status(500).json({ error: 'Failed to set env var' });
+  }
+});
+
+// DELETE /api/projects/:id/env/:key — delete env var
+router.delete('/:id/env/:key', jwtAuth, async (req, res) => {
+  try {
+    const project = await query('SELECT * FROM projects WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.userId]);
+    if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const key = decodeURIComponent(req.params.key);
+    await query('DELETE FROM env_vars WHERE project_id=$1 AND key=$2', [req.params.id, key]);
+    res.json({ deleted: true });
+  } catch (err) {
+    console.error('Delete env var error:', err);
+    res.status(500).json({ error: 'Failed to delete env var' });
   }
 });
 
