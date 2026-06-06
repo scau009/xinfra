@@ -52,6 +52,7 @@ export default function Login() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const token = params.get('token');
@@ -68,7 +69,8 @@ export default function Login() {
     try {
       const { url } = await api.getLoginUrl();
       window.location.href = url;
-    } catch {
+    } catch (err) {
+      setError(err.message);
       setLoading(false);
     }
   }
@@ -86,6 +88,13 @@ export default function Login() {
         <p style={S.subtitle}>
           Deploy your code in seconds.<br/>Zero config. One command.
         </p>
+        {error && (
+          <div style={{
+            color:'var(--danger)',fontSize:'13px',marginBottom:'20px',
+            padding:'10px 16px',border:'1px solid var(--danger)',
+            display:'inline-block',
+          }}>! {error}</div>
+        )}
         <button
           onClick={handleLogin}
           disabled={loading}
