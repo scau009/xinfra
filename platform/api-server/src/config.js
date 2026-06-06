@@ -1,5 +1,9 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: '../.env.example' });
+import { existsSync } from 'fs';
+
+// Try .env first, fall back to .env.example
+const envPath = existsSync('../.env') ? '../.env' : '../.env.example';
+dotenv.config({ path: envPath });
 
 export const config = {
   port: parseInt(process.env.PORT || '3000'),

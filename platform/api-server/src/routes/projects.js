@@ -36,7 +36,16 @@ router.post('/', jwtAuth, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('Create project error:', err);
-    res.status(500).json({ error: 'Failed to create project' });
+    // Duplicate domain or repo name — project already exists
+    if (err.code === '23505' && err.constraint === 'projects_domain_key') {
+      return res.status(409).json({
+        error: `A project with domain "${domain}" already exists. Delete it first or use a different repo name.`,
+      });
+    }
+    if (err.code === '23505') {
+      return res.status(409).json({ error: `Project "${repoName}" already exists.` });
+    }
+    res.status(500).json({ error: err.message || 'Failed to create project' });
   }
 });
 
