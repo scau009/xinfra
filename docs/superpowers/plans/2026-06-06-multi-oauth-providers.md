@@ -10,18 +10,33 @@
 
 ---
 
-### Task 1: Database Schema — Add `user_identities`, migrate data, drop `github_id`
+### Task 1: Database Schema — Versioned Migration System + `user_identities`
 
 **Files:**
 - Modify: `platform/api-server/src/db.js`
 
-- [ ] **Step 1: Update SCHEMA_SQL to add `user_identities`, drop `github_id`, add migration logic**
+- [ ] **Step 1: Add `schema_migrations` table and versioned migration runner**
 
-Replace the `SCHEMA_SQL` constant and `initDb` function in `platform/api-server/src/db.js` with the following:
+Replace the entire content of `platform/api-server/src/db.js` with the following:
 
 ```js
-const SCHEMA_SQL = `
+import pg from 'pg';
+import { config } from './config.js';
+
+const pool = new pg.Pool({
+  connectionString: config.databaseUrl,
+});
+
+// ── Base schema (version 0) ──────────────────────────────────────────
+// This is the always-idempotent foundation. New tables added here use
+// IF NOT EXISTS so initDb is safe to run repeatedly on fresh DBs.
+const BASE_SCHEMA_SQL = `
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY,
+    applied_at TIMESTAMPTZ DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -82,43 +97,106 @@ CREATE INDEX IF NOT EXISTS idx_deploys_project_id ON deploys(project_id);
 CREATE INDEX IF NOT EXISTS idx_deploys_status ON deploys(status);
 `;
 
-const MIGRATE_SQL = `
--- Migrate github_id from users to user_identities if the column still exists
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'users' AND column_name = 'github_id'
-  ) THEN
-    INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email, profile_data)
-    SELECT id, 'github', github_id::VARCHAR, email, '{}'::jsonb
-    FROM users WHERE github_id IS NOT NULL
-    ON CONFLICT (provider, provider_user_id) DO NOTHING;
+// ── Migration definitions ────────────────────────────────────────────
+// Each migration has a version number, description, and SQL.
+// Migrations are applied in version order exactly once.
+// The SQL MUST be idempotent (guard with IF EXISTS / IF NOT EXISTS).
 
-    ALTER TABLE users DROP COLUMN github_id;
-  END IF;
-END $$;
-`;
+const MIGRATIONS = [
+  {
+    version: 1,
+    description: 'migrate github_id from users to user_identities, then drop column',
+    sql: `
+      -- If users table still has github_id column (pre-migration DB),
+      -- move data to user_identities and drop the column.
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'users' AND column_name = 'github_id'
+        ) THEN
+          INSERT INTO user_identities (user_id, provider, provider_user_id, provider_email, profile_data)
+          SELECT id, 'github', github_id::VARCHAR, email, '{}'::jsonb
+          FROM users WHERE github_id IS NOT NULL
+          ON CONFLICT (provider, provider_user_id) DO NOTHING;
+
+          ALTER TABLE users DROP COLUMN github_id;
+        END IF;
+      END $$;
+    `,
+  },
+  // Future migrations go here, e.g.:
+  // { version: 2, description: 'add refresh_token column to user_identities', sql: `...` },
+];
+
+// ── Migration runner ─────────────────────────────────────────────────
+
+async function getCurrentVersion(client) {
+  const res = await client.query('SELECT MAX(version) as v FROM schema_migrations');
+  return res.rows[0]?.v || 0;
+}
+
+async function applyMigrations(client) {
+  const currentVersion = await getCurrentVersion(client);
+
+  const pending = MIGRATIONS
+    .filter(m => m.version > currentVersion)
+    .sort((a, b) => a.version - b.version);
+
+  if (pending.length === 0) {
+    console.log(`DB schema is up to date (version ${currentVersion})`);
+    return;
+  }
+
+  console.log(`Running ${pending.length} pending migration(s) (current version: ${currentVersion})...`);
+
+  for (const m of pending) {
+    console.log(`  Migration v${m.version}: ${m.description}...`);
+    await client.query('BEGIN');
+    try {
+      await client.query(m.sql);
+      await client.query('INSERT INTO schema_migrations (version) VALUES ($1)', [m.version]);
+      await client.query('COMMIT');
+      console.log(`  Migration v${m.version}: ✓ applied`);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error(`  Migration v${m.version}: ✗ FAILED — ${err.message}`);
+      throw err;
+    }
+  }
+
+  console.log(`All migrations applied. DB now at version ${pending[pending.length - 1].version}`);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────
 
 export async function initDb() {
   const client = await pool.connect();
   try {
-    await client.query(SCHEMA_SQL);
-    await client.query(MIGRATE_SQL);
+    await client.query(BASE_SCHEMA_SQL);
+    await applyMigrations(client);
     console.log('Database schema initialized');
   } finally {
     client.release();
   }
 }
-```
 
-Note: Keep the `pool`, `query()`, and `getClient()` exports unchanged.
+// ── Public API ───────────────────────────────────────────────────────
+
+export function query(text, params) {
+  return pool.query(text, params);
+}
+
+export function getClient() {
+  return pool.connect();
+}
+```
 
 - [ ] **Step 2: Commit**
 
 ```bash
 git add platform/api-server/src/db.js
-git commit -m "feat(db): add user_identities table, migrate github_id from users"
+git commit -m "feat(db): add versioned migration system and user_identities table"
 ```
 
 ---
@@ -815,7 +893,139 @@ git commit -m "feat(config): add Google OAuth env vars to .env.example"
 
 ---
 
-### Task 8: Verification — Smoke Test
+### Task 8: Production Deployment & Migration Steps
+
+**This task documents the production rollout procedure.** No code changes.
+
+- [ ] **Step 1: Pre-deployment — backup database**
+
+```bash
+# Dump the full database before migration (run on production host)
+docker compose exec postgres pg_dump -U plat plat > ~/plat-db-backup-$(date +%Y%m%d-%H%M%S).sql
+echo "Backup saved to ~/plat-db-backup-*.sql"
+```
+
+- [ ] **Step 2: Pre-deployment — verify current DB state**
+
+```bash
+# Confirm we have existing users with github_id
+docker compose exec postgres psql -U plat -d plat -c "
+  SELECT count(*) as total_users,
+         count(github_id) as users_with_github_id
+  FROM users;
+"
+```
+
+Expected: `total_users` should equal `users_with_github_id` if all users logged in via GitHub.
+
+- [ ] **Step 3: Pre-deployment — configure Google OAuth credentials**
+
+Add to production `.env`:
+
+```env
+GOOGLE_OAUTH_CLIENT_ID=<your-google-client-id>
+GOOGLE_OAUTH_CLIENT_SECRET=<your-google-client-secret>
+```
+
+To obtain these:
+1. Go to https://console.cloud.google.com/apis/credentials
+2. Create OAuth 2.0 Client ID (Web application)
+3. Add Authorized redirect URI: `https://<your-platform-domain>/api/auth/google/callback`
+4. Copy Client ID and Client Secret
+
+- [ ] **Step 4: Deploy — rolling restart**
+
+```bash
+# Pull latest code
+git pull origin main
+
+# Rebuild and restart only the api-server (migration runs on startup)
+cd platform
+docker compose up -d --build api-server
+
+# Wait for migration to complete
+sleep 5
+docker compose logs api-server | grep -E "Migration|schema"
+```
+
+Expected log output:
+```
+Running 1 pending migration(s) (current version: 0)...
+  Migration v1: migrate github_id from users to user_identities, then drop column...
+  Migration v1: ✓ applied
+All migrations applied. DB now at version 1
+Database schema initialized
+API Server listening on port 3000
+```
+
+- [ ] **Step 5: Post-deployment — verify migration**
+
+```bash
+# Check migration version
+docker compose exec postgres psql -U plat -d plat -c "SELECT * FROM schema_migrations;"
+
+# Verify user_identities has the migrated data
+docker compose exec postgres psql -U plat -d plat -c "
+  SELECT ui.provider, count(*) as identities
+  FROM user_identities ui
+  GROUP BY ui.provider;
+"
+
+# Confirm github_id column is gone from users
+docker compose exec postgres psql -U plat -d plat -c "
+  SELECT column_name FROM information_schema.columns
+  WHERE table_name='users' AND column_name='github_id';
+"
+```
+
+Expected:
+- `schema_migrations` shows version 1
+- `identities` count matches previous `users_with_github_id` count
+- Last query returns 0 rows (column removed)
+
+- [ ] **Step 6: Post-deployment — rebuild frontend**
+
+```bash
+cd platform/web && npm run build
+# If using Docker for frontend:
+docker compose up -d --build web
+```
+
+- [ ] **Step 7: Post-deployment — smoke test login flow**
+
+```bash
+# Test GitHub OAuth still works
+curl -s https://<your-platform-domain>/api/auth/github | python3 -m json.tool
+# Expected: { "url": "https://github.com/login/oauth/authorize?..." }
+
+# Test Google OAuth endpoint appears
+curl -s https://<your-platform-domain>/api/auth/providers | python3 -m json.tool
+# Expected: [{ "id": "github", "name": "GitHub" }, { "id": "google", "name": "Google" }]
+```
+
+- [ ] **Step 8: Rollback procedure (if migration fails)**
+
+If migration v1 fails (very unlikely — only moves data and drops column):
+
+```bash
+# Restore from backup
+docker compose exec -T postgres psql -U plat -d plat < ~/plat-db-backup-YYYYMMDD-HHMMSS.sql
+
+# Roll back code to previous commit
+git revert <migration-commit-hash>
+docker compose up -d --build api-server
+
+# Verify users can log in with GitHub
+curl -s https://<your-platform-domain>/api/auth/github
+```
+
+If migration succeeds but Google OAuth has issues:
+- No rollback needed — Google is additive, GitHub path is unaffected
+- Simply remove `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` from `.env` and restart api-server; Google button disappears from the frontend automatically (`getEnabledProviders` filters out providers with no credentials)
+
+---
+
+### Task 9: Verification — Smoke Test
 
 **Files:** None (verification only)
 
@@ -861,7 +1071,7 @@ Expected: `npm run build` completes without errors.
 ## Self-Review
 
 ### Spec Coverage
-- ✅ Database: `user_identities` table, migrate `github_id` — Task 1
+- ✅ Database: `user_identities` table, versioned migration — Task 1
 - ✅ Account merging by email — Task 3 (`findOrCreateUser`)
 - ✅ Generic OAuth routes (`/:provider`, `/:provider/callback`) — Task 4
 - ✅ OAuth service abstraction with providers — Task 2 + Task 3
@@ -870,7 +1080,10 @@ Expected: `npm run build` completes without errors.
 - ✅ Config: Google env vars — Task 2 Step 1 + Task 7
 - ✅ Frontend multi-button — Task 6
 - ✅ `/me` endpoint returns identities — Task 4
-- ✅ Backward compat (old GitHub routes work) — Task 4 (parameterized routes handle `github` same as before)
+- ✅ Backward compat (old GitHub routes work) — Task 4
+- ✅ Versioned migration system (`schema_migrations` table) — Task 1
+- ✅ Production deployment steps (pre-deploy backup, rolling restart, post-deploy verification) — Task 8
+- ✅ Rollback procedure — Task 8 Step 8
 
 ### Placeholder Scan
 - No TBD, TODO, or incomplete sections
@@ -881,3 +1094,4 @@ Expected: `npm run build` completes without errors.
 - Provider interface: `id`, `name`, `authEndpoint`, `tokenEndpoint`, `userInfoEndpoint`, `clientId()`, `clientSecret()`, `scopes`, `exchangeCode()`, `getUser()` — consistent across github.js, google.js, and usage in oauth/index.js
 - `getUser()` returns `{ providerUserId, email, username, avatarUrl, profileData }` — used consistently in `findOrCreateUser()`
 - `getAuthorizationUrl()` and `handleCallback()` signatures match route usage
+- Migration version type: integer PRIMARY KEY — consistent between `schema_migrations` table and `MIGRATIONS` array entries
