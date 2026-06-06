@@ -1,0 +1,15 @@
+{
+  "name": "plat-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for Plat deploy platform",
+  "type": "module",
+  "bin": {
+    "plat": "./src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "tar": "^7.4.0"
+  }
+}
