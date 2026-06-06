@@ -12,24 +12,23 @@
     :root{
       --bg:#050505;
       --surface:#0a0a0a;
-      --surface2:#0f0f0f;
-      --border:#1a1a1a;
-      --border-light:#252525;
-      --text:#ddd;
-      --text-dim:#777;
-      --text-muted:#444;
+      --surface2:#111;
+      --border:#2a2a2a;
+      --border-light:#3d3d3d;
+      --text:#fff;
+      --text-dim:#bbb;
+      --text-muted:#999;
       --accent:#fff;
-      --danger:#ff3333;
-      --success:#00e676;
-      --warn:#ffaa00;
+      --danger:#ff5555;
+      --success:#00ff88;
+      --warn:#ffbb33;
       --font:'JetBrains Mono',monospace;
-      --radius:2px;
     }
     body{
       background:var(--bg);
       color:var(--text);
       font-family:var(--font);
-      font-size:12px;
+      font-size:16px;
       line-height:1.65;
       -webkit-font-smoothing:antialiased;
       min-height:100vh;
@@ -40,16 +39,16 @@
       position:fixed;
       inset:0;
       background-image:
-        linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),
-        linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px);
+        linear-gradient(rgba(255,255,255,0.015) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(255,255,255,0.015) 1px,transparent 1px);
       background-size:40px 40px;
       pointer-events:none;
       z-index:0;
     }
     #root{position:relative;z-index:1}
     a{color:var(--text);text-decoration:none}
-    button{font-family:var(--font);cursor:pointer;font-size:12px;letter-spacing:-0.01em}
-    input{font-family:var(--font);font-size:12px;letter-spacing:-0.01em}
+    button{font-family:var(--font);cursor:pointer;font-size:14px;letter-spacing:-0.01em}
+    input{font-family:var(--font);font-size:14px;letter-spacing:-0.01em}
     ::selection{background:var(--accent);color:var(--bg)}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-track{background:transparent}

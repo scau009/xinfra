@@ -10,9 +10,9 @@ export default function DeployButton({ onDeploy, loading, hasRunningDeploy }) {
       disabled={disabled}
       style={{
         display:'inline-flex',alignItems:'center',gap:'10px',
-        padding:'10px 28px',fontSize:'12px',fontWeight:600,
+        padding:'12px 30px',fontSize:'14px',fontWeight:600,
         backgroundColor: disabled ? 'transparent' : 'var(--accent)',
-        color: disabled ? 'var(--text-muted)' : 'var(--bg)',
+        color: disabled ? 'var(--text-dim)' : 'var(--bg)',
         border: disabled ? '1px solid var(--border)' : '1px solid var(--accent)',
         textTransform:'uppercase',letterSpacing:'0.15em',
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -35,7 +35,7 @@ export default function DeployButton({ onDeploy, loading, hasRunningDeploy }) {
 function Spinner() {
   return (
     <span style={{
-      display:'inline-block',width:'12px',height:'12px',
+      display:'inline-block',width:'14px',height:'14px',
       border:'2px solid var(--bg)',
       borderTopColor:'transparent',borderRadius:'50%',
       animation:'spin .6s linear infinite',

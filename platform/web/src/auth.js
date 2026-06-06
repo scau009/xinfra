@@ -10,4 +10,5 @@ export function setToken(token) {
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  window.location.href = '/login';
 }

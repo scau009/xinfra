@@ -3,41 +3,41 @@ import { getToken } from '../auth';
 
 const S = {
   item: {
-    display:'flex',alignItems:'center',padding:'10px 0',
+    display:'flex',alignItems:'center',padding:'12px 0',
     borderBottom:'1px solid var(--border)',
-    gap:'12px',
+    gap:'14px',
   },
-  key: { flex:1,fontSize:'12px',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' },
+  key: { flex:1,fontSize:'13px',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap' },
   value: {
-    fontSize:'11px',color:'var(--text-muted)',
-    letterSpacing:'0.2em',marginRight:'8px',
+    fontSize:'12px',color:'var(--text-muted)',
+    letterSpacing:'0.2em',marginRight:'10px',
   },
   delBtn: {
-    padding:'4px 10px',backgroundColor:'transparent',
+    padding:'5px 12px',backgroundColor:'transparent',
     color:'var(--danger)',border:'1px solid transparent',
-    fontSize:'10px',cursor:'pointer',textTransform:'uppercase',
+    fontSize:'11px',cursor:'pointer',textTransform:'uppercase',
     letterSpacing:'0.1em',transition:'all .15s',
   },
   form: {
-    display:'flex',gap:'8px',marginTop:'14px',paddingTop:'14px',
+    display:'flex',gap:'10px',marginTop:'16px',paddingTop:'16px',
     borderTop:'1px solid var(--border)',
   },
   input: {
-    padding:'8px 12px',backgroundColor:'var(--bg)',color:'var(--text)',
-    border:'1px solid var(--border)',outline:'none',fontSize:'11px',
+    padding:'10px 14px',backgroundColor:'var(--bg)',color:'var(--text)',
+    border:'1px solid var(--border)',outline:'none',fontSize:'13px',
     transition:'border-color .15s',
   },
   addBtn: {
-    padding:'8px 18px',backgroundColor:'var(--accent)',color:'var(--bg)',
-    border:'none',fontSize:'11px',fontWeight:600,textTransform:'uppercase',
+    padding:'10px 20px',backgroundColor:'var(--accent)',color:'var(--bg)',
+    border:'none',fontSize:'13px',fontWeight:600,textTransform:'uppercase',
     letterSpacing:'0.1em',cursor:'pointer',
   },
   empty: {
-    padding:'20px 0',color:'var(--text-muted)',fontSize:'11px',
+    padding:'24px 0',color:'var(--text-muted)',fontSize:'13px',
     textAlign:'center',borderBottom:'1px solid var(--border)',
   },
   error: {
-    padding:'6px 0',color:'var(--danger)',fontSize:'11px',
+    padding:'8px 0',color:'var(--danger)',fontSize:'12px',
   },
 };
 
@@ -126,7 +126,7 @@ export default function EnvVarForm({ projectId }) {
       <form onSubmit={addVar} style={S.form}>
         <input
           value={newKey} onChange={e=>setNewKey(e.target.value)}
-          placeholder="KEY" style={{...S.input,width:'140px'}}
+          placeholder="KEY" style={{...S.input,width:'150px'}}
           onFocus={e=>e.target.style.borderColor='var(--border-light)'}
           onBlur={e=>e.target.style.borderColor='var(--border)'}
         />
