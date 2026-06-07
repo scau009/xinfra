@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 import { useI18n } from '../i18n/context';
 import LanguageSwitcher from '../i18n/switcher';
+import Logo from '../components/Logo';
 
 const S = {
   // Layout
@@ -221,19 +222,30 @@ export default function Landing() {
   const { t, lang } = useI18n();
   const [loginUrl, setLoginUrl] = useState(null);
 
+  const [loginLoading, setLoginLoading] = useState(false);
+
   useEffect(() => {
     api.getLoginUrl('github').then(({ url }) => setLoginUrl(url)).catch(() => {});
   }, []);
 
-  function handleLogin(provider = 'github') {
-    if (provider === 'github' && loginUrl) {
-      window.location.href = loginUrl;
+  function handleLogin(provider) {
+    // Normalize: React onClick passes event as first arg, direct calls pass string
+    const p = typeof provider === 'string' ? provider : 'github';
+    if (loginLoading) return;
+    setLoginLoading(true);
+    // Use pre-fetched URL if available and matching, otherwise fetch on demand
+    const doRedirect = (url) => { window.location.href = url; };
+
+    if (p === 'github' && loginUrl) {
+      doRedirect(loginUrl);
       return;
     }
-    // For other providers, fetch and redirect
-    api.getLoginUrl(provider).then(({ url }) => {
-      window.location.href = url;
-    }).catch(() => {});
+
+    api.getLoginUrl(p).then(({ url }) => {
+      doRedirect(url);
+    }).catch(() => {
+      setLoginLoading(false);
+    });
   }
 
   return (
@@ -241,7 +253,7 @@ export default function Landing() {
 
       {/* ── Navigation ── */}
       <nav style={S.nav}>
-        <span style={S.logo}>{t('brand.name')}</span>
+        <Logo size={20} />
         <div style={S.navLinks}>
           <LanguageSwitcher />
           <a href="#features" style={S.navLink}
@@ -257,9 +269,10 @@ export default function Landing() {
             padding:'6px 16px',border:'1px solid var(--border-light)',
           }}
             onClick={handleLogin}
+            disabled={loginLoading}
             onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.color='var(--text)'}}
             onMouseLeave={e=>{e.target.style.borderColor='var(--border-light)';e.target.style.color='var(--text-dim)'}}
-          >{t('nav.login')}</button>
+          >{loginLoading ? '...' : t('nav.login')}</button>
         </div>
       </nav>
 
@@ -277,11 +290,12 @@ export default function Landing() {
         <div style={S.heroCtaRow}>
           <button style={S.btnPrimary}
             onClick={handleLogin}
+            disabled={loginLoading}
             onMouseEnter={e=>e.target.style.opacity='0.85'}
             onMouseLeave={e=>e.target.style.opacity='1'}
           >
-            {t('landing.hero.cta')}
-            <span style={S.cursor} />
+            {loginLoading ? '...' : t('landing.hero.cta')}
+            {!loginLoading && <span style={S.cursor} />}
           </button>
           <a href="/login" style={S.btnGhost}
             onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.backgroundColor='var(--surface)'}}
@@ -358,11 +372,12 @@ export default function Landing() {
         </p>
         <button style={S.btnPrimary}
           onClick={handleLogin}
+          disabled={loginLoading}
           onMouseEnter={e=>e.target.style.opacity='0.85'}
           onMouseLeave={e=>e.target.style.opacity='1'}
         >
-          {t('landing.cta.btn')}
-          <span style={S.cursor} />
+          {loginLoading ? '...' : t('landing.cta.btn')}
+          {!loginLoading && <span style={S.cursor} />}
         </button>
       </section>
 
@@ -380,13 +395,15 @@ export default function Landing() {
             onMouseEnter={e=>e.target.style.color='var(--text)'}
             onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
           >{t('footer.how')}</a>
-          <button onClick={handleLogin} style={{
+          <button onClick={handleLogin}
+            disabled={loginLoading}
+            style={{
             ...S.footerLink,background:'none',border:'none',
             fontFamily:'var(--font)',cursor:'pointer',
           }}
             onMouseEnter={e=>e.target.style.color='var(--text)'}
             onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
-          >{t('footer.login')}</button>
+          >{loginLoading ? '...' : t('footer.login')}</button>
         </div>
       </footer>
 
