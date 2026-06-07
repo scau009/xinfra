@@ -25,7 +25,7 @@ async function request(path, options = {}) {
 
 export const api = {
   // Auth
-  getLoginUrl: () => request('/api/auth/github'),
+  getLoginUrl: (provider = 'github') => request(`/api/auth/${provider}`),
   getMe: () => request('/api/auth/me'),
 
   // Projects
@@ -33,6 +33,7 @@ export const api = {
   createProject: (data) => request('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
   getProject: (id) => request(`/api/projects/${id}`),
   deployProject: (id) => request(`/api/projects/${id}/deploy`, { method: 'POST' }),
+  stopProject: (id) => request(`/api/projects/${id}/stop`, { method: 'POST' }),
   deleteProject: (id) => request(`/api/projects/${id}`, { method: 'DELETE' }),
 
   // Deploys
