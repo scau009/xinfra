@@ -632,66 +632,47 @@ git commit -m "refactor(github): remove OAuth functions, keep repo API helpers"
 
 ---
 
-### Task 6: Frontend — Multi-Provider Login Page
+### Task 6: Frontend — Multi-Provider Login (Login page + Landing page + i18n)
 
 **Files:**
 - Modify: `platform/web/src/api.js`
 - Modify: `platform/web/src/pages/Login.jsx`
+- Modify: `platform/web/src/pages/Landing.jsx`
+- Modify: `platform/web/src/i18n/translations.js`
 
-- [ ] **Step 1: Update api.js to support provider parameter**
+- [ ] **Step 1: Update api.js — parameterize `getLoginUrl`**
 
 In `platform/web/src/api.js`, change the `getLoginUrl` line:
 
+Change this:
+```js
+getLoginUrl: () => request('/api/auth/github'),
+```
+
+To this:
 ```js
 getLoginUrl: (provider = 'github') => request(`/api/auth/${provider}`),
 ```
 
-The full file should be:
+Keep all other methods (`stopProject`, etc.) unchanged.
 
+- [ ] **Step 2: Add i18n translations for Google login**
+
+In `platform/web/src/i18n/translations.js`, add new login-related keys.
+
+Add after `'login.github_btn'` (line ~85 in English section):
 ```js
-import { getToken } from './auth';
-
-const BASE = '';
-
-async function request(path, options = {}) {
-  const headers = { ...options.headers };
-  const token = getToken();
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (!(options.body instanceof FormData)) {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
-  if (res.status === 401) {
-    localStorage.removeItem('plat_token');
-    window.location.href = '/login';
-    throw new Error('Unauthorized');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Request failed' }));
-    throw new Error(err.error);
-  }
-  return res.json();
-}
-
-export const api = {
-  // Auth
-  getLoginUrl: (provider = 'github') => request(`/api/auth/${provider}`),
-  getMe: () => request('/api/auth/me'),
-
-  // Projects
-  listProjects: () => request('/api/projects'),
-  createProject: (data) => request('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
-  getProject: (id) => request(`/api/projects/${id}`),
-  deployProject: (id) => request(`/api/projects/${id}/deploy`, { method: 'POST' }),
-  deleteProject: (id) => request(`/api/projects/${id}`, { method: 'DELETE' }),
-
-  // Deploys
-  getDeploy: (id) => request(`/api/deploys/${id}`),
-};
+    'login.google_btn': 'Login with Google',
+    'login.providers_title': 'Choose a login method',
 ```
 
-- [ ] **Step 2: Update Login.jsx with multi-button provider layout**
+Add after `'login.github_btn'` (line ~232 in Chinese section):
+```js
+    'login.google_btn': '使用 Google 登录',
+    'login.providers_title': '选择登录方式',
+```
+
+- [ ] **Step 3: Update Login.jsx — multi-provider buttons with i18n**
 
 Replace the content of `platform/web/src/pages/Login.jsx` with:
 
@@ -700,6 +681,8 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { setToken, getToken } from '../auth';
 import { api } from '../api';
+import { useI18n } from '../i18n/context';
+import LanguageSwitcher from '../i18n/switcher';
 
 const S = {
   wrap: {
@@ -749,15 +732,17 @@ const S = {
   },
 };
 
+// Provider list — each has an id matching the API route param and an i18n key
 const PROVIDERS = [
-  { id: 'github', name: 'GitHub' },
-  { id: 'google', name: 'Google' },
+  { id: 'github', btnKey: 'login.github_btn' },
+  { id: 'google', btnKey: 'login.google_btn' },
 ];
 
 export default function Login({ onLogin }) {
+  const { t } = useI18n();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(null); // which provider is loading
+  const [loading, setLoading] = useState(null); // which provider id is loading
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -792,9 +777,11 @@ export default function Login({ onLogin }) {
     <div style={S.wrap}>
       <div style={S.card}>
         <div style={S.ascii}>{ascii}</div>
-        <h1 style={S.title}>Plat</h1>
+        <h1 style={S.title}>{t('brand.name')}</h1>
         <p style={S.subtitle}>
-          Deploy your code in seconds.<br/>Zero config. One command.
+          {t('login.subtitle').split('\n').map((line, i) => (
+            <span key={i}>{i > 0 && <br />}{line}</span>
+          ))}
         </p>
         {error && (
           <div style={{
@@ -819,24 +806,106 @@ export default function Login({ onLogin }) {
               onMouseEnter={e => { if(!loading) e.target.style.borderColor='var(--text)'; }}
               onMouseLeave={e => { e.target.style.borderColor='var(--border-light)'; }}
             >
-              {loading === prov.id ? 'Connecting...' : `Login with ${prov.name}`}
+              {loading === prov.id ? t('login.connecting') : t(prov.btnKey)}
               {loading !== prov.id && <span style={S.cursor} />}
             </button>
           ))}
         </div>
         <div style={S.divider} />
-        <p style={S.footer}>v0.1.0 — Alpha</p>
+        <p style={S.footer}>{t('login.footer')}</p>
+        <div style={{marginTop:'24px'}}><LanguageSwitcher /></div>
       </div>
     </div>
   );
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Update Landing.jsx — multi-provider support**
+
+The Landing page has 3 login buttons (nav, hero CTA, footer). Replace `handleLogin` and the `useEffect` to support selecting a provider.
+
+In `platform/web/src/pages/Landing.jsx`, change the `useEffect` and `handleLogin`:
+
+```jsx
+export default function Landing() {
+  const { t, lang } = useI18n();
+  const [loginUrl, setLoginUrl] = useState(null);
+  const [showProviderMenu, setShowProviderMenu] = useState(false);
+
+  // Pre-fetch GitHub login URL (primary CTA, keep for backward compat)
+  useEffect(() => {
+    api.getLoginUrl('github').then(({ url }) => setLoginUrl(url)).catch(() => {});
+  }, []);
+
+  function handleLogin(provider = 'github') {
+    if (provider === 'github' && loginUrl) {
+      window.location.href = loginUrl;
+      return;
+    }
+    // For other providers, fetch and redirect
+    api.getLoginUrl(provider).then(({ url }) => {
+      window.location.href = url;
+    }).catch(() => {});
+  }
+  // ... rest of the component stays the same, but replace the nav login button
+```
+
+And replace the nav login button (around line 248-255) to show a simple dropdown or just use the GitHub login from the pre-fetched URL:
+
+The nav button:
+```jsx
+<button style={{
+  ...S.navLink,
+  padding:'6px 16px',border:'1px solid var(--border-light)',
+}}
+  onClick={() => handleLogin('github')}
+  onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.color='var(--text)'}}
+  onMouseLeave={e=>{e.target.style.borderColor='var(--border-light)';e.target.style.color='var(--text-dim)'}}
+>{t('nav.login')}</button>
+```
+
+The hero CTA button(s) — add a secondary login button instead of the "how it works" ghost button at the current position, or keep the primary CTA as GitHub and add a "More options" text link:
+
+```jsx
+<div style={S.heroCtaRow}>
+  <button style={S.btnPrimary}
+    onClick={() => handleLogin('github')}
+    onMouseEnter={e=>e.target.style.opacity='0.85'}
+    onMouseLeave={e=>e.target.style.opacity='1'}
+  >
+    {t('landing.hero.cta')}
+    <span style={S.cursor} />
+  </button>
+  <a href="/login" style={S.btnGhost}
+    onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.backgroundColor='var(--surface)'}}
+    onMouseLeave={e=>{e.target.style.borderColor='var(--border-light)';e.target.style.backgroundColor='transparent'}}
+  >
+    {t('landing.hero.cta_secondary')}
+  </a>
+</div>
+```
+
+The footer login button:
+```jsx
+<button onClick={() => handleLogin('github')} style={{
+  ...S.footerLink,background:'none',border:'none',
+  fontFamily:'var(--font)',cursor:'pointer',
+}}
+  onMouseEnter={e=>e.target.style.color='var(--text)'}
+  onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
+>{t('footer.login')}</button>
+```
+
+**Design decision for Landing:** The Landing page keeps GitHub as the primary CTA (one-click). Users wanting Google login go to `/login` page via the secondary button. This preserves the Landing page's clean single-CTA UX while still providing access to Google login. The `/login` page shows all provider buttons equally.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add platform/web/src/api.js platform/web/src/pages/Login.jsx
-git commit -m "feat(web): add multi-provider login buttons (GitHub + Google)"
+git add platform/web/src/api.js \
+        platform/web/src/pages/Login.jsx \
+        platform/web/src/pages/Landing.jsx \
+        platform/web/src/i18n/translations.js
+git commit -m "feat(web): add multi-provider login with i18n (GitHub + Google)"
 ```
 
 ---
@@ -1078,7 +1147,10 @@ Expected: `npm run build` completes without errors.
 - ✅ Google OAuth provider — Task 2, Step 3
 - ✅ GitHub OAuth provider — Task 2, Step 2
 - ✅ Config: Google env vars — Task 2 Step 1 + Task 7
-- ✅ Frontend multi-button — Task 6
+- ✅ Frontend multi-button (Login.jsx + Landing.jsx + i18n) — Task 6
+- ✅ i18n translations for Google login (zh + en) — Task 6 Step 2
+- ✅ Landing page: GitHub as primary CTA, `/login` page for multi-provider choice — Task 6 Step 4
+- ✅ `api.js` getLoginUrl parameterized — Task 6 Step 1
 - ✅ `/me` endpoint returns identities — Task 4
 - ✅ Backward compat (old GitHub routes work) — Task 4
 - ✅ Versioned migration system (`schema_migrations` table) — Task 1
