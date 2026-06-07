@@ -1,8 +1,11 @@
+import { useI18n } from '../i18n/context';
+
 export default function DeployButton({ onDeploy, loading, hasRunningDeploy }) {
+  const { t } = useI18n();
   const disabled = loading || hasRunningDeploy;
-  const label = loading ? 'Deploying...'
-    : hasRunningDeploy ? 'In progress'
-    : 'Deploy';
+  const label = loading ? t('deploy.deploying')
+    : hasRunningDeploy ? t('deploy.in_progress')
+    : t('deploy.deploy');
 
   return (
     <button

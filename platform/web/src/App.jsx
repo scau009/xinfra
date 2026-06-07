@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Landing from './pages/Landing';
 import ProjectDetail from './pages/ProjectDetail';
 import { getToken } from './auth';
 
@@ -23,7 +24,7 @@ export default function App() {
     <Routes>
       <Route path="/auth/callback" element={<Login onLogin={checkAuth} />} />
       <Route path="/login" element={<Login onLogin={checkAuth} />} />
-      <Route path="/" element={isLoggedIn ? <Dashboard /> : <Navigate to="/login" replace />} />
+      <Route path="/" element={isLoggedIn ? <Dashboard /> : <Landing />} />
       <Route path="/projects/:id" element={isLoggedIn ? <ProjectDetail /> : <Navigate to="/login" replace />} />
     </Routes>
   );

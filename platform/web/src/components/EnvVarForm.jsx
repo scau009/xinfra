@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getToken } from '../auth';
+import { useI18n } from '../i18n/context';
 
 const S = {
   item: {
@@ -42,6 +43,7 @@ const S = {
 };
 
 export default function EnvVarForm({ projectId }) {
+  const { t } = useI18n();
   const [vars, setVars] = useState([]);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
@@ -103,9 +105,9 @@ export default function EnvVarForm({ projectId }) {
   return (
     <div>
       {loading ? (
-        <div style={S.empty}>Loading...</div>
+        <div style={S.empty}>{t('env.loading')}</div>
       ) : vars.length === 0 ? (
-        <div style={S.empty}>No environment variables configured</div>
+        <div style={S.empty}>{t('env.empty')}</div>
       ) : (
         vars.map(v=>(
           <div key={v.key} style={S.item}>
@@ -116,7 +118,7 @@ export default function EnvVarForm({ projectId }) {
               onClick={()=>deleteVar(v.key)}
               onMouseEnter={e=>e.target.style.borderColor='var(--danger)'}
               onMouseLeave={e=>e.target.style.borderColor='transparent'}
-            >Del</button>
+            >{t('env.del_btn')}</button>
           </div>
         ))
       )}
@@ -126,13 +128,13 @@ export default function EnvVarForm({ projectId }) {
       <form onSubmit={addVar} style={S.form}>
         <input
           value={newKey} onChange={e=>setNewKey(e.target.value)}
-          placeholder="KEY" style={{...S.input,width:'150px'}}
+          placeholder={t('env.key_placeholder')} style={{...S.input,width:'150px'}}
           onFocus={e=>e.target.style.borderColor='var(--border-light)'}
           onBlur={e=>e.target.style.borderColor='var(--border)'}
         />
         <input
           value={newValue} onChange={e=>setNewValue(e.target.value)}
-          placeholder="VALUE" style={{...S.input,flex:1}}
+          placeholder={t('env.value_placeholder')} style={{...S.input,flex:1}}
           onFocus={e=>e.target.style.borderColor='var(--border-light)'}
           onBlur={e=>e.target.style.borderColor='var(--border)'}
         />
@@ -141,7 +143,7 @@ export default function EnvVarForm({ projectId }) {
           opacity:adding?0.5:1,
           cursor:adding?'wait':'pointer',
         }}>
-          {adding ? '...' : 'Add'}
+          {adding ? t('env.adding') : t('env.add_btn')}
         </button>
       </form>
     </div>

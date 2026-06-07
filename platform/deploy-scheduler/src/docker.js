@@ -6,10 +6,29 @@ export function pullImage(image) {
 
 export function stopAndRemoveContainer(containerName) {
   try {
-    execSync(`docker stop ${containerName}`, { stdio: 'pipe' });
-    execSync(`docker rm ${containerName}`, { stdio: 'pipe' });
-  } catch {
-    // Container doesn't exist, ignore
+    console.log(`[docker] stopping container: ${containerName}`);
+    execSync(`docker stop --time 5 ${containerName}`, { stdio: 'pipe', timeout: 15000 });
+    console.log(`[docker] stopped: ${containerName}`);
+  } catch (e) {
+    console.log(`[docker] stop ${containerName}: ${e.message || 'ignored'}`);
+  }
+  try {
+    console.log(`[docker] removing container: ${containerName}`);
+    execSync(`docker rm ${containerName}`, { stdio: 'pipe', timeout: 5000 });
+    console.log(`[docker] removed: ${containerName}`);
+  } catch (e) {
+    console.log(`[docker] rm ${containerName}: ${e.message || 'ignored'}`);
+  }
+}
+
+export function removeImages(images) {
+  for (const image of images) {
+    try {
+      execSync(`docker rmi ${image}`, { stdio: 'pipe' });
+      console.log(`Removed image: ${image}`);
+    } catch {
+      // Image might be in use by other containers, or already removed — ignore
+    }
   }
 }
 

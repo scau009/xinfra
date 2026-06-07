@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { jwtAuth } from '../middleware/jwtAuth.js';
 import { query } from '../db.js';
-import { pushBuildTask } from '../services/queue.js';
+import { pushBuildTask, pushCleanupTask, pushStopTask, deleteBuildLogs } from '../services/queue.js';
 import { encryptEnvVar } from '../services/crypto.js';
 
 const router = Router();
@@ -100,14 +100,77 @@ router.post('/:id/deploy', jwtAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/projects/:id — delete a project
-router.delete('/:id', jwtAuth, async (req, res) => {
+// POST /api/projects/:id/stop — stop a running project
+router.post('/:id/stop', jwtAuth, async (req, res) => {
   try {
-    const result = await query(
-      'DELETE FROM projects WHERE id=$1 AND user_id=$2 RETURNING id',
+    const project = await query(
+      'SELECT * FROM projects WHERE id=$1 AND user_id=$2',
       [req.params.id, req.user.userId]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+    if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const { id: projectId, repo_name: repoName } = project.rows[0];
+
+    // Find running deploy
+    const running = await query(
+      "SELECT id FROM deploys WHERE project_id=$1 AND status='running' ORDER BY created_at DESC LIMIT 1",
+      [projectId]
+    );
+    if (running.rows.length === 0) {
+      return res.status(400).json({ error: 'No running deploy to stop' });
+    }
+
+    // Push stop task to deploy-scheduler
+    await pushStopTask({ projectId, repoName });
+
+    // Mark deploy as stopped
+    await query("UPDATE deploys SET status='stopped', finished_at=NOW() WHERE id=$1", [running.rows[0].id]);
+
+    res.json({ stopped: true });
+  } catch (err) {
+    console.error('Stop project error:', err);
+    res.status(500).json({ error: 'Failed to stop project' });
+  }
+});
+
+// DELETE /api/projects/:id — delete a project and all related resources
+router.delete('/:id', jwtAuth, async (req, res) => {
+  try {
+    // Verify ownership
+    const project = await query(
+      'SELECT * FROM projects WHERE id=$1 AND user_id=$2',
+      [req.params.id, req.user.userId]
+    );
+    if (project.rows.length === 0) return res.status(404).json({ error: 'Project not found' });
+
+    const { id: projectId, repo_name: repoName } = project.rows[0];
+
+    // Collect deploy info for cleanup
+    const deploys = await query(
+      'SELECT id, image_tag FROM deploys WHERE project_id=$1',
+      [projectId]
+    );
+    const deployIds = deploys.rows.map(d => d.id);
+    const images = [...new Set(deploys.rows.map(d => d.image_tag).filter(Boolean))];
+
+    // Push cleanup task to deploy-scheduler (stop container, remove images)
+    await pushCleanupTask({
+      projectId,
+      repoName,
+      images,
+      deployIds,
+    });
+
+    // Delete child rows (env_vars and deploys don't have ON DELETE CASCADE)
+    await query('DELETE FROM env_vars WHERE project_id=$1', [projectId]);
+    await query('DELETE FROM deploys WHERE project_id=$1', [projectId]);
+
+    // Delete the project itself
+    await query('DELETE FROM projects WHERE id=$1', [projectId]);
+
+    // Clean up Redis build log keys
+    await deleteBuildLogs(deployIds);
+
     res.json({ deleted: true });
   } catch (err) {
     console.error('Delete project error:', err);

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getToken } from '../auth';
+import { useI18n } from '../i18n/context';
 
 const S = {
   wrap: {
@@ -48,6 +49,7 @@ const S = {
 };
 
 export default function DeployLog({ deployId, onComplete }) {
+  const { t } = useI18n();
   const [lines, setLines] = useState([]);
   const [status, setStatus] = useState(null);
   const [connected, setConnected] = useState(false);
@@ -125,7 +127,7 @@ export default function DeployLog({ deployId, onComplete }) {
   return (
     <div style={S.wrap}>
       <div style={S.header}>
-        <span>Deploy Log</span>
+        <span>{t('log.title')}</span>
         <div style={S.dots}>
           <span style={S.dot('#ff5f57')} />
           <span style={S.dot('#febc2e')} />
@@ -135,11 +137,11 @@ export default function DeployLog({ deployId, onComplete }) {
 
       <div style={S.body} ref={containerRef}>
         {!connected && !status && (
-          <div style={S.connecting}>Connecting to build stream...</div>
+          <div style={S.connecting}>{t('log.connecting')}</div>
         )}
 
         {lines.length === 0 && connected && !status && (
-          <div style={S.empty}>Waiting for build output...</div>
+          <div style={S.empty}>{t('log.waiting')}</div>
         )}
 
         {lines.map((line, i) => (
@@ -150,12 +152,12 @@ export default function DeployLog({ deployId, onComplete }) {
 
         {status && status !== 'error' && (
           <div style={S.banner(status)}>
-            {status === 'running' ? '✓ Deploy successful' : '✗ Deploy failed'}
+            {status === 'running' ? t('log.success') : t('log.failed')}
           </div>
         )}
 
         {status === 'error' && (
-          <div style={S.banner('failed')}>✗ Stream disconnected</div>
+          <div style={S.banner('failed')}>{t('log.disconnected')}</div>
         )}
       </div>
     </div>

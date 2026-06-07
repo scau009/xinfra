@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { jwtAuth } from '../middleware/jwtAuth.js';
 import { query } from '../db.js';
-import { popBuildLog } from '../services/queue.js';
+import { getBuildLogs } from '../services/queue.js';
 
 const router = Router();
 
@@ -48,12 +48,19 @@ router.get('/:id/logs', jwtAuth, async (req, res) => {
     'X-Accel-Buffering': 'no',
   });
 
-  // Send existing log_text first
-  if (deploy.rows[0].log_text) {
-    res.write(`data: ${JSON.stringify({ type: 'log', line: deploy.rows[0].log_text })}\n\n`);
+  // Send existing log_text from DB first
+  const logText = deploy.rows[0].log_text || '';
+  if (logText) {
+    // Split by newlines and send each line
+    for (const line of logText.split('\n')) {
+      if (line) res.write(`data: ${JSON.stringify({ type: 'log', line })}\n\n`);
+    }
   }
 
-  // Poll Redis for new log lines
+  let lastIndex = 0;
+  let completed = false;
+
+  // Poll Redis for log lines (non-destructive LRANGE)
   const interval = setInterval(async () => {
     try {
       const current = await query('SELECT status FROM deploys WHERE id=$1', [deployId]);
@@ -63,13 +70,25 @@ router.get('/:id/logs', jwtAuth, async (req, res) => {
         return;
       }
 
-      const line = await popBuildLog(deployId, 1);
-      if (line) {
-        res.write(`data: ${JSON.stringify({ type: 'log', line })}\n\n`);
+      // Get all new lines since last index (non-destructive)
+      const lines = await getBuildLogs(deployId, lastIndex);
+      if (lines && lines.length > 0) {
+        for (const line of lines) {
+          res.write(`data: ${JSON.stringify({ type: 'log', line })}\n\n`);
+        }
+        lastIndex += lines.length;
       }
 
       const status = current.rows[0].status;
-      if (status === 'running' || status === 'failed') {
+      if ((status === 'running' || status === 'failed') && !completed) {
+        completed = true;
+        // One final sweep for any remaining lines
+        const final = await getBuildLogs(deployId, lastIndex);
+        if (final && final.length > 0) {
+          for (const line of final) {
+            res.write(`data: ${JSON.stringify({ type: 'log', line })}\n\n`);
+          }
+        }
         res.write(`data: ${JSON.stringify({ type: 'done', status })}\n\n`);
         clearInterval(interval);
         res.end();

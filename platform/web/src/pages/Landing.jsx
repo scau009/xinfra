@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { Link } from 'react-router-dom';
 import { useI18n } from '../i18n/context';
 import LanguageSwitcher from '../i18n/switcher';
 import Logo from '../components/Logo';
@@ -29,12 +29,6 @@ const S = {
 
   // Hero
   hero: { padding:'100px 24px 80px',maxWidth:'960px',margin:'0 auto',textAlign:'center' },
-  ascii: {
-    fontSize:'11px',lineHeight:1.25,color:'var(--text-dim)',
-    whiteSpace:'pre',marginBottom:'40px',userSelect:'none',
-    display:'inline-block',textAlign:'left',
-    animation:'fadeIn .8s ease',
-  },
   heroTitle: {
     fontSize:'clamp(32px,6vw,56px)',fontWeight:400,
     letterSpacing:'0.05em',marginBottom:'20px',
@@ -189,12 +183,6 @@ const S = {
   },
 };
 
-const ASCII_LINES = [
-  `    ⣠⣶⣶⣦⣄⠀⠀⠀⠀⣠⣶⣶⣦⡀`,
-  `    ⣿⣿⣿⣿⣿⡇⠀⠀⢠⣿⣿⣿⣿⣿`,
-  `    ⠘⣿⣿⣿⣿⠃⠀⠀⢸⣿⣿⣿⣿⡇`,
-  `    ⠀⠘⠛⠛⠛⠀⠀⠀⠀⠘⠛⠛⠟⠃`,
-];
 
 const FEATURE_KEYS = [
   { icon:'>', titleKey:'feature.zero_config.title', zhKey:'feature.zero_config.zh', descKey:'feature.zero_config.desc' },
@@ -220,33 +208,22 @@ const FRAMEWORKS = [
 
 export default function Landing() {
   const { t, lang } = useI18n();
-  const [loginUrl, setLoginUrl] = useState(null);
-
-  const [loginLoading, setLoginLoading] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [typingDone, setTypingDone] = useState(false);
 
   useEffect(() => {
-    api.getLoginUrl('github').then(({ url }) => setLoginUrl(url)).catch(() => {});
+    const word = 'deploy';
+    let i = 0;
+    const timer = setInterval(() => {
+      setTyped(word.slice(0, i + 1));
+      i++;
+      if (i >= word.length) {
+        clearInterval(timer);
+        setTypingDone(true);
+      }
+    }, 140);
+    return () => clearInterval(timer);
   }, []);
-
-  function handleLogin(provider) {
-    // Normalize: React onClick passes event as first arg, direct calls pass string
-    const p = typeof provider === 'string' ? provider : 'github';
-    if (loginLoading) return;
-    setLoginLoading(true);
-    // Use pre-fetched URL if available and matching, otherwise fetch on demand
-    const doRedirect = (url) => { window.location.href = url; };
-
-    if (p === 'github' && loginUrl) {
-      doRedirect(loginUrl);
-      return;
-    }
-
-    api.getLoginUrl(p).then(({ url }) => {
-      doRedirect(url);
-    }).catch(() => {
-      setLoginLoading(false);
-    });
-  }
 
   return (
     <div style={S.wrap}>
@@ -264,21 +241,35 @@ export default function Landing() {
             onMouseEnter={e=>e.target.style.color='var(--text)'}
             onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
           >{t('nav.how')}</a>
-          <button style={{
+          <Link to="/login" style={{
             ...S.navLink,
             padding:'6px 16px',border:'1px solid var(--border-light)',
           }}
-            onClick={handleLogin}
-            disabled={loginLoading}
             onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.color='var(--text)'}}
             onMouseLeave={e=>{e.target.style.borderColor='var(--border-light)';e.target.style.color='var(--text-dim)'}}
-          >{loginLoading ? '...' : t('nav.login')}</button>
+          >{t('nav.login')}</Link>
         </div>
       </nav>
 
       {/* ── Hero ── */}
       <section style={S.hero}>
-        <div style={S.ascii}>{ASCII_LINES.join('\n')}</div>
+        <div style={{
+          display:'flex',justifyContent:'center',alignItems:'baseline',
+          marginBottom:'40px',fontFamily:'var(--font)',fontSize:'clamp(28px,5vw,48px)',
+          fontWeight:300,color:'var(--text)',letterSpacing:'0.04em',
+          animation:'fadeIn .4s ease both',
+        }}>
+          <span style={{color:'var(--text-dim)',marginRight:'6px'}}>&gt;&nbsp;</span>
+          <span>{typed}</span>
+          <span style={{
+            display:'inline-block',
+            width:'clamp(12px,2vw,18px)',
+            height:'0.88em',
+            backgroundColor:'var(--accent)',
+            animation:'blink 1s step-end infinite',
+            marginLeft:'2px',
+          }} />
+        </div>
         <h1 style={S.heroTitle}>{t('landing.hero.title')}</h1>
         {lang === 'zh' && <p style={S.zhTitle}>{t('landing.hero.subtitle')}</p>}
         <p style={S.heroTagline}>
@@ -288,21 +279,21 @@ export default function Landing() {
           {t('landing.hero.zh_desc')}
         </p>}
         <div style={S.heroCtaRow}>
-          <button style={S.btnPrimary}
-            onClick={handleLogin}
-            disabled={loginLoading}
+          <Link to="/login" style={{
+            ...S.btnPrimary,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'8px',
+          }}
             onMouseEnter={e=>e.target.style.opacity='0.85'}
             onMouseLeave={e=>e.target.style.opacity='1'}
           >
-            {loginLoading ? '...' : t('landing.hero.cta')}
-            {!loginLoading && <span style={S.cursor} />}
-          </button>
-          <a href="/login" style={S.btnGhost}
+            {t('landing.hero.cta')}
+            <span style={S.cursor} />
+          </Link>
+          <Link to="/login" style={{...S.btnGhost,textDecoration:'none'}}
             onMouseEnter={e=>{e.target.style.borderColor='var(--text)';e.target.style.backgroundColor='var(--surface)'}}
             onMouseLeave={e=>{e.target.style.borderColor='var(--border-light)';e.target.style.backgroundColor='transparent'}}
           >
             {t('landing.hero.cta_secondary')}
-          </a>
+          </Link>
         </div>
       </section>
 
@@ -370,15 +361,15 @@ export default function Landing() {
         <p style={S.ctaDesc}>
           {lang === 'zh' ? t('landing.cta.zh_desc') : t('landing.cta.desc')}
         </p>
-        <button style={S.btnPrimary}
-          onClick={handleLogin}
-          disabled={loginLoading}
+        <Link to="/login" style={{
+          ...S.btnPrimary,textDecoration:'none',display:'inline-flex',alignItems:'center',gap:'8px',
+        }}
           onMouseEnter={e=>e.target.style.opacity='0.85'}
           onMouseLeave={e=>e.target.style.opacity='1'}
         >
-          {loginLoading ? '...' : t('landing.cta.btn')}
-          {!loginLoading && <span style={S.cursor} />}
-        </button>
+          {t('landing.cta.btn')}
+          <span style={S.cursor} />
+        </Link>
       </section>
 
       {/* ── Footer ── */}
@@ -395,15 +386,10 @@ export default function Landing() {
             onMouseEnter={e=>e.target.style.color='var(--text)'}
             onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
           >{t('footer.how')}</a>
-          <button onClick={handleLogin}
-            disabled={loginLoading}
-            style={{
-            ...S.footerLink,background:'none',border:'none',
-            fontFamily:'var(--font)',cursor:'pointer',
-          }}
+          <Link to="/login" style={S.footerLink}
             onMouseEnter={e=>e.target.style.color='var(--text)'}
             onMouseLeave={e=>e.target.style.color='var(--text-dim)'}
-          >{loginLoading ? '...' : t('footer.login')}</button>
+          >{t('footer.login')}</Link>
         </div>
       </footer>
 

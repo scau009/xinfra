@@ -11,16 +11,16 @@ const translations = {
     'brand.name': 'Plat',
 
     // ── Landing ──
-    'landing.hero.title': "Deploy like it's 1999",
-    'landing.hero.subtitle': '自建部署平台 · 一键上线',
-    'landing.hero.desc': 'A self-hosted deploy platform for developers who want Vercel-like DX on their own infrastructure. Push to deploy. One command. No YAML. No PhD.',
-    'landing.hero.zh_desc': '推送代码，即刻部署。无需 YAML 配置，无需运维博士学位。',
+    'landing.hero.title': 'From vibe coding to live.',
+    'landing.hero.subtitle': '让每个创意都能落地',
+    'landing.hero.desc': 'Built a cool project? Ship it in one click. No Docker, no Kubernetes, no ops degree — Plat auto-detects your framework, builds a container, and deploys it to your own server with HTTPS.',
+    'landing.hero.zh_desc': '创意无需止步于本地。推送代码，即刻上线，无需运维经验。',
     'landing.hero.cta': 'Start Deploying',
     'landing.hero.cta_secondary': 'See how it works →',
     'landing.features.label': '// 01. Capabilities',
     'landing.features.title': "Everything you need, nothing you don't.",
     'landing.features.zh_sub': '化繁为简，回归本质。',
-    'landing.features.desc': 'Plat handles the entire deploy pipeline so you can focus on building. No configuration files. No infrastructure headaches.',
+    'landing.features.desc': 'Plat handles the entire deploy pipeline so you can focus on what matters — building cool stuff. No config files, no ops headaches.',
 
     // Features cards
     'feature.zero_config.title': 'Zero Config',
@@ -69,12 +69,12 @@ const translations = {
     // CTA
     'landing.cta.title': 'Ready to ship?',
     'landing.cta.zh_sub': '准备好启程了吗？',
-    'landing.cta.desc': 'One server. Unlimited projects. Zero configuration.\nJoin the terminal revolution.',
-    'landing.cta.zh_desc': '一台服务器，无限项目，零配置。',
+    'landing.cta.desc': 'One server. Unlimited projects. Zero configuration.\nDeploy your vibe. Own your infrastructure.',
+    'landing.cta.zh_desc': '一台服务器，无限项目，零配置。\n部署你的创意，掌控你的基础设施。',
     'landing.cta.btn': 'Login with GitHub',
 
     // Footer
-    'landing.footer': 'Plat v0.1.0 — Self-hosted deploy platform. Made for vibe coders.',
+    'landing.footer': 'Plat v0.1.0 — Self-hosted deploy platform. From vibe coding to live.',
     'footer.features': 'Features',
     'footer.how': 'How it works',
     'footer.login': 'Login',
@@ -160,16 +160,16 @@ const translations = {
     'brand.name': 'Plat',
 
     // ── Landing ──
-    'landing.hero.title': '像 1999 年一样部署',
-    'landing.hero.subtitle': '自建部署平台 · 一键上线',
-    'landing.hero.desc': '面向开发者的自托管部署平台，在自己的服务器上获得类 Vercel 的体验。推送即部署，一个命令，无需 YAML，无需博士学位。',
-    'landing.hero.zh_desc': '推送代码，即刻部署。无需 YAML 配置，无需运维博士学位。',
+    'landing.hero.title': '灵感落地，一键上线。',
+    'landing.hero.subtitle': '让每个创意都能落地',
+    'landing.hero.desc': '写了好玩的项目？一键上线。不需要 Docker、Kubernetes 或运维经验——Plat 自动识别框架、构建容器，部署到你自己的服务器上，自带 HTTPS。',
+    'landing.hero.zh_desc': '创意无需止步于本地。推送代码，即刻上线，无需运维经验。',
     'landing.hero.cta': '开始部署',
     'landing.hero.cta_secondary': '了解如何工作 →',
     'landing.features.label': '// 01. 功能特性',
     'landing.features.title': '化繁为简，回归本质。',
     'landing.features.zh_sub': '化繁为简，回归本质。',
-    'landing.features.desc': 'Plat 负责整个部署流水线，让你专注于开发。无需配置文件，无需操心基础设施。',
+    'landing.features.desc': 'Plat 负责整个部署流水线，让你专注于创造。无需配置文件，无需操心基础设施。',
 
     // Features cards
     'feature.zero_config.title': '零配置',
@@ -219,11 +219,11 @@ const translations = {
     'landing.cta.title': '准备好启程了吗？',
     'landing.cta.zh_sub': '准备好启程了吗？',
     'landing.cta.desc': '一台服务器，无限项目，零配置。',
-    'landing.cta.zh_desc': '一台服务器，无限项目，零配置。',
+    'landing.cta.zh_desc': '一台服务器，无限项目，零配置。\n部署你的创意，掌控你的基础设施。',
     'landing.cta.btn': '使用 GitHub 登录',
 
     // Footer
-    'landing.footer': 'Plat v0.1.0 — 自托管部署平台，为 Vibe Coder 而生。',
+    'landing.footer': 'Plat v0.1.0 — 自托管部署平台，从灵感落地到线上运行。',
     'footer.features': '功能',
     'footer.how': '工作流程',
     'footer.login': '登录',

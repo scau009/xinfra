@@ -27,6 +27,7 @@ export async function runDeploy(task) {
 
     await log(deployId, 'Stopping old container...');
     stopAndRemoveContainer(containerName);
+    console.log(`[deploy:${deployId}] Container cleanup done, loading env vars...`);
 
     await log(deployId, 'Loading environment variables...');
     const envVars = await getDecryptedEnvVars(projectId);
@@ -45,11 +46,11 @@ export async function runDeploy(task) {
 
     await log(deployId, `Deploy complete! https://${domain}`);
     await updateDeployStatus(deployId, 'running');
-    await pushBuildLog(deployId, '__STATUS__:running');
+    pushBuildLog(deployId, '__STATUS__:running').catch(() => {});
   } catch (err) {
     await log(deployId, `Deploy failed: ${err.message}`);
     await updateDeployStatus(deployId, 'failed');
-    await pushBuildLog(deployId, '__STATUS__:failed');
+    pushBuildLog(deployId, '__STATUS__:failed').catch(() => {});
   }
 }
 
@@ -57,5 +58,10 @@ async function log(deployId, message) {
   const timestamp = new Date().toISOString().slice(11, 19);
   const line = `[${timestamp}] ${message}`;
   console.log(`[deploy:${deployId}] ${line}`);
-  await pushBuildLog(deployId, line);
+  // Fire-and-forget: don't block the deploy flow on Redis/DB writes
+  pushBuildLog(deployId, line).catch(() => {});
+  pool.query(
+    `UPDATE deploys SET log_text = COALESCE(log_text, '') || $1 || E'\n' WHERE id=$2`,
+    [line, deployId]
+  ).catch(() => {});
 }

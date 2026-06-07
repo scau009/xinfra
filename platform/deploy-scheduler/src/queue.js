@@ -19,6 +19,21 @@ export async function popDeployTask(timeout = 0) {
   return JSON.parse(result.element);
 }
 
+// Blocking pop of a cleanup task
+export async function popCleanupTask(timeout = 0) {
+  const result = await client.blPop('cleanup:queue', timeout);
+  if (!result) return null;
+  return JSON.parse(result.element);
+}
+
+// Blocking pop from multiple queues — returns { key, task }
+// Uses BLPOP with multiple keys so only ONE blocking command is active
+export async function popAnyTask(timeout = 0) {
+  const result = await client.blPop(['deploy:queue', 'cleanup:queue', 'stop:queue'], timeout);
+  if (!result) return null;
+  return { key: result.key, task: JSON.parse(result.element) };
+}
+
 // Write a build log line
 export async function pushBuildLog(deployId, line) {
   await client.rPush(`build:log:${deployId}`, line);
