@@ -1,6 +1,6 @@
 # Production override — uses pre-built images from container registry.
 # Usage:
-#   echo "REGISTRY_URL=ccr.ccs.tencentyun.com" > .env.prod
+#   echo "REGISTRY_URL=fourcats-xinfra.tencentcloudcr.com" > .env.prod
 #   echo "REGISTRY_NAMESPACE=plat" >> .env.prod
 #   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 
