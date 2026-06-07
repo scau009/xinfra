@@ -34,9 +34,8 @@ export function removeImages(images) {
 
 export function runContainer({ image, containerName, targetPort, domain, envVars, memory, cpus, hostPort }) {
   const labels = [
-    'traefik.enable=true',
-    `traefik.http.routers.${containerName}.rule=Host(\`${domain}\`)`,
-    `traefik.http.services.${containerName}.loadbalancer.server.port=${targetPort}`,
+    `caddy=${domain}`,
+    `caddy.reverse_proxy={{upstreams ${targetPort}}}`,
   ];
 
   const envArgs = envVars.map(({ key, value }) => `--env ${key}=${value}`).join(' ');

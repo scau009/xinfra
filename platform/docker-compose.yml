@@ -1,15 +1,4 @@
 services:
-  traefik:
-    image: traefik:v3.3
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - traefik-certs:/letsencrypt
-    restart: unless-stopped
-
   postgres:
     image: postgres:16-alpine
     environment:
@@ -49,12 +38,9 @@ services:
       REGISTRY_URL: ${REGISTRY_URL}
       REGISTRY_NAMESPACE: ${REGISTRY_NAMESPACE}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN}
-    ports:
-      - "3000:3000"  # local dev direct access
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.${PLATFORM_DOMAIN}`)"
-      - "traefik.http.services.api.loadbalancer.server.port=3000"
+      caddy: "api.${PLATFORM_DOMAIN}"
+      caddy.reverse_proxy: "{{upstreams 3000}}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,8 +82,9 @@ services:
 
   web:
     build: ./web
-    ports:
-      - "5173:80"  # local dev: vite dev port -> nginx
+    labels:
+      caddy: "${PLATFORM_DOMAIN}"
+      caddy.reverse_proxy: "{{upstreams 80}}"
     depends_on:
       - api-server
     restart: unless-stopped
@@ -105,5 +92,4 @@ services:
 volumes:
   pgdata:
   redisdata:
-  traefik-certs:
   build-tmp:
