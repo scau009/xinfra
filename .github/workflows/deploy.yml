@@ -11,7 +11,7 @@ env:
 jobs:
   build-and-deploy:
     name: Build, Push & Deploy
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -65,19 +65,14 @@ jobs:
           docker push $REGISTRY_BASE/plat-web:$IMAGE_TAG
           docker push $REGISTRY_BASE/plat-web:latest
 
-      - name: Deploy to server
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            cd /opt/plat
-            cat > .env.ci << EOF
-            REGISTRY_URL=${{ secrets.REGISTRY_URL }}
-            REGISTRY_NAMESPACE=${{ secrets.REGISTRY_NAMESPACE }}
-            EOF
-            docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci pull
-            docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci up -d --remove-orphans
-            rm -f .env.ci
-            docker image prune -f
+      - name: Deploy (restart services)
+        working-directory: /opt/plat
+        run: |
+          cat > .env.ci << EOF
+          REGISTRY_URL=${{ secrets.REGISTRY_URL }}
+          REGISTRY_NAMESPACE=${{ secrets.REGISTRY_NAMESPACE }}
+          EOF
+          docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci pull
+          docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci up -d --remove-orphans
+          rm -f .env.ci
+          docker image prune -f
