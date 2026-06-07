@@ -18,6 +18,10 @@ export const config = {
     appPrivateKey: process.env.GITHUB_APP_PRIVATE_KEY,
     webhookSecret: process.env.GITHUB_WEBHOOK_SECRET,
   },
+  google: {
+    oauthClientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
+    oauthClientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+  },
   registry: {
     url: process.env.REGISTRY_URL || 'registry.local',
     namespace: process.env.REGISTRY_NAMESPACE || 'plat',
