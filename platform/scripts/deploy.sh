@@ -2,7 +2,8 @@
 set -e
 
 REPO_DIR="/opt/plat/repo"
-COMPOSE_DIR="/opt/plat"
+ENV_DIR="/opt/plat"             # .env lives here (secrets, NOT in repo)
+COMPOSE_FILE="$REPO_DIR/platform/docker-compose.prod.yml"
 
 # === Pull latest code ===
 echo "[deploy] pulling latest code..."
@@ -14,7 +15,7 @@ echo "[deploy] commit: $IMAGE_TAG"
 
 # === Load registry config ===
 set -a
-source "$COMPOSE_DIR/.env"
+source "$ENV_DIR/.env"
 set +a
 
 REGISTRY_BASE="${REGISTRY_URL}/${REGISTRY_NAMESPACE}"
@@ -34,13 +35,13 @@ for service in api-server build-runner deploy-scheduler web; do
 done
 
 # === Deploy ===
-cd "$COMPOSE_DIR"
+cd "$ENV_DIR"
 cat > .env.ci << EOF
 REGISTRY_URL=${REGISTRY_URL}
 REGISTRY_NAMESPACE=${REGISTRY_NAMESPACE}
 EOF
-docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci pull
-docker compose -f docker-compose.prod.yml --env-file .env --env-file .env.ci up -d --remove-orphans
+docker compose -f "$COMPOSE_FILE" --env-file .env --env-file .env.ci pull
+docker compose -f "$COMPOSE_FILE" --env-file .env --env-file .env.ci up -d --remove-orphans
 rm -f .env.ci
 docker image prune -f
 
